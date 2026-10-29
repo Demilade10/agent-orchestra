@@ -4,9 +4,11 @@ A small multi-agent orchestration system built in Python. Give it a project goal
 
 This is portfolio project 1 of 3: multi-agent orchestration, followed by a guarded RAG system, then an AI agent with audit logs. Only project 1 is implemented here.
 
-## Run in one minute
+## Setup
 
-Requires Python 3.11 or newer. No third-party Python packages are needed.
+Requires Python 3.11 or newer. Python 3.13.14 confirmed working. No third-party Python packages are needed.
+
+Clone or download the repository, then run all commands from the project root.
 
 ```bash
 python -m orchestra "Plan a low-cost motor vibration monitoring system"
@@ -16,14 +18,32 @@ The default **demo mode uses clearly labelled, fixed fixtures**. It exercises th
 
 ## Run with a real local model
 
-Install [Ollama](https://ollama.com), start its local server, and download a model:
+1. Install [Ollama](https://ollama.com).
+   - Windows: `winget install Ollama.Ollama` or download the installer from [ollama.com](https://ollama.com).
+   - macOS/Linux: see the Ollama website for platform-specific instructions.
+2. Start the Ollama server in a separate terminal (it must stay running):
+   ```bash
+   ollama serve
+   ```
+3. Pull a model. `llama3.2` is a reasonable default (~2 GB); use `tinyllama` on machines with less than 4 GB free RAM:
+   ```bash
+   ollama pull llama3.2
+   ```
+4. Run the system:
+   ```bash
+   python -m orchestra "Plan a low-cost motor vibration monitoring system for a student project. Include requirements, components, architecture, implementation steps, failure risks, and acceptance tests." --provider ollama --model llama3.2 --timeout 180 --concurrency 1
+   ```
 
-```bash
-ollama pull llama3.2
-python -m orchestra "Plan a low-cost motor vibration monitoring system" --provider ollama --model llama3.2 --timeout 120
-```
+Use `--concurrency 1` on machines with less than 8 GB RAM. Scheduler concurrency controls how many agents are submitted at once; Ollama processes one request at a time by default, so raising `--concurrency` above 1 does not produce parallel inference — it only affects which agents are *ready to submit* concurrently.
 
-If Ollama is not running, start it with `ollama serve` in another terminal. Model downloads need internet access and local inference needs sufficient RAM. Choose a model your computer can run; use `--concurrency 1` for constrained machines. Scheduler concurrency does not guarantee concurrent inference on the model server.
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `RuntimeError: Ollama request failed` or connection refused | Ollama server not running | Run `ollama serve` in a separate terminal and leave it open |
+| `RuntimeError` immediately after model pull | Model name mismatch | Run `ollama list` to see exact names; pass the name shown there to `--model` |
+| Very slow inference or out-of-memory errors | Model too large for available RAM | Use `--concurrency 1`, close other applications, or switch to a smaller model: `ollama pull tinyllama` |
+| All agents show `[FAIL]` | Provider or network error during inference | Check `runs/<latest-uuid>/run.json` for the `error` field on each agent |
 
 Each agent makes a separate model call with its own role and dependency context. The same model powers all roles by default. The local adapter uses Ollama's [chat endpoint](https://github.com/ollama/ollama/blob/main/docs/api.md), with streaming disabled.
 

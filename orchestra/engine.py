@@ -62,8 +62,10 @@ async def orchestrate(agents: list[Agent], goal: str, provider: Provider, *,
             result = Result("skipped", error="Dependency failed or was skipped")
             run.results[agent.name] = result
             event(agent.name, "skipped")
+            print(f"[SKIP]  {agent.name}")
             return result
         context = {name: r.output for name, r in dependencies.items()}
+        print(f"[START] {agent.name}")
         for attempt in range(1, retries + 2):
             async with slots:
                 event(agent.name, "running", attempt=attempt)
@@ -78,9 +80,14 @@ async def orchestrate(agents: list[Agent], goal: str, provider: Provider, *,
                 break
             if attempt <= retries:
                 event(agent.name, "retrying", attempt=attempt, error=result.error)
+                print(f"[RETRY] {agent.name} attempt {attempt + 1}")
                 await asyncio.sleep(min(0.1 * 2 ** (attempt - 1), 2))
         run.results[agent.name] = result
         event(agent.name, result.status, attempts=result.attempts, error=result.error)
+        if result.status == "succeeded":
+            print(f"[DONE]  {agent.name}")
+        else:
+            print(f"[FAIL]  {agent.name} — {result.error}")
         return result
 
     # All tasks are registered before the event loop runs them, including forward dependencies.
