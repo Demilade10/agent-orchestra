@@ -82,3 +82,13 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         for kwargs in [{"concurrency": 0}, {"timeout": 0}, {"retries": -1}]:
             with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
                 await orchestrate([Agent("a", "")], "goal", None, **kwargs)
+
+    async def test_permanent_error_exhausts_retries(self):
+        """A provider that always raises should exhaust all retries and mark the agent failed."""
+        class Provider:
+            async def generate(self, *args):
+                raise RuntimeError("permanent")
+        run = await orchestrate([Agent("a", "")], "goal", Provider(), retries=2)
+        self.assertEqual(run.results["a"].status, "failed")
+        self.assertEqual(run.results["a"].attempts, 3)   # 1 initial + 2 retries
+        self.assertEqual(run.results["a"].error, "RuntimeError")
